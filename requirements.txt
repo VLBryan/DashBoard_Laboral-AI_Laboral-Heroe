@@ -1,3 +1,9 @@
+streamlit>=1.20
+pandas
+pymongo
+plotly
+altair
+pyarrow
 
 
 Tareas:
