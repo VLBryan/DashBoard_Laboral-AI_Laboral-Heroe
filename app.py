@@ -2,6 +2,15 @@
 import streamlit as st
 from data_loader import build_all, load_df_cache
 import os
+from kpi_calculator import (
+    compute_basic_kpis,
+    compute_new_users_by_window,
+    compute_application_kpis,
+    compute_top_skills_coverage,
+    compute_hero_comparison,
+    compute_time_to_first_application,
+    compute_time_series
+)
 
 st.set_page_config(layout="wide", page_title="Laboral.AI - Dashboard")
 
@@ -22,3 +31,26 @@ df_user_skills = data["df_user_skills"]
 st.title("Laboral.AI - Postulantes")
 st.metric("Total postulantes", len(df_master))
 st.dataframe(df_master[["user_id","firstName","lastName","country","region","city","score","top_skills","is_laboral_hero"]].head(50))
+
+#    ------ KPIs ------
+
+data = load_data("nombre_de_tu_db")  # desde data_loader
+df_master = data["df_master"]
+df_user_skills = data["df_user_skills"]
+df_apps = data.get("applications", None)
+
+# KPIs
+basic = compute_basic_kpis(df_master)
+new_users = compute_new_users_by_window(df_master)
+apps_kpis = compute_application_kpis(df_master)
+top_skills = compute_top_skills_coverage(df_user_skills, df_master, top_n=10)
+hero_cmp = compute_hero_comparison(df_master)
+time_to_first = compute_time_to_first_application(df_master, df_apps)
+ts = compute_time_series(df_master, df_apps, freq="W")
+
+# Mostrar en Streamlit
+st.metric("Total postulantes", basic["total_users"])
+st.metric("Laboral Heroes", f'{basic["laboral_heroes_count"]} ({basic["pct_laboral_heroes"]:.1f}%)')
+st.metric("Promedio employability score", f'{basic["avg_employability_score"]:.1f}')
+st.dataframe(top_skills)
+st.dataframe(hero_cmp)
