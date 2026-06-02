@@ -19,6 +19,10 @@ from kpi_by_location import (
     prepare_choropleth_df,
     compute_segment_kpis
 )
+from viz_factory import (
+    choropleth_by_country, top_skills_bar, score_distribution,
+    time_series_users, simple_funnel, match_heatmap, kpi_indicator
+)
 
 st.set_page_config(layout="wide", page_title="Laboral.AI - Dashboard")
 
@@ -81,3 +85,23 @@ st.dataframe(hero_cmp_country)
 
 ts = compute_time_series_by_location(df_master, df_applications, level="country", freq="W")
 st.line_chart(ts['users_ts'].pivot(index='createdAt', columns='country', values='new_users').fillna(0))
+
+
+#    ------ Funciones que devuelvan directamente objetos ------
+
+
+# df_choro, df_skills, df_master, ts, funnel_steps, df_matches ya preparados
+fig_map = choropleth_by_country(df_choro, title="Postulantes por país")
+st.plotly_chart(fig_map, use_container_width=True)
+
+fig_top = top_skills_bar(df_skills, top_n=12, title="Top 12 skills")
+st.plotly_chart(fig_top, use_container_width=True)
+
+fig_score = score_distribution(df_master)
+st.plotly_chart(fig_score, use_container_width=True)
+
+fig_ts = time_series_users(ts['users_ts'], date_col='createdAt', value_col='new_users', title="Nuevos usuarios (semanal)")
+st.plotly_chart(fig_ts, use_container_width=True)
+
+fig_kpi = kpi_indicator(basic_kpis['total_users'], "Total postulantes")
+st.plotly_chart(fig_kpi)

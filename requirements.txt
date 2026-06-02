@@ -1,0 +1,4 @@
+
+
+Tareas:
+Performance: si tienes muchas ubicaciones y usuarios, pre-agrega (ETL) y guarda parquet por nivel (country/region/city) para consultas rápidas en Streamlit.
