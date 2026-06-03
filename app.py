@@ -66,14 +66,6 @@ selected_countries = st.sidebar.multiselect("País", options=countries, default=
 # Laboral Hero
 hero_filter = st.sidebar.selectbox("Laboral Hero", options=["Todos", "Solo Heroes", "No Heroes"], index=0)
 
-# Score slider
-if 'score' in df_master.columns:
-    min_score = int(pd.to_numeric(df_master['score'], errors='coerce').min(skipna=True) or 0)
-    max_score = int(pd.to_numeric(df_master['score'], errors='coerce').max(skipna=True) or 100)
-    score_range = st.sidebar.slider("Rango score", min_value=min_score, max_value=max_score, value=(min_score, max_score))
-else:
-    score_range = None
-
 # Top N skills
 top_n_skills = st.sidebar.slider("Top N skills (visual)", 5, 30, 12)
 
@@ -91,6 +83,7 @@ if st.sidebar.button("Forzar recarga datos (ETL)"):
 # Aplicar filtros al df_master
 # -------------------------
 df = df_master.copy()
+
 # fecha
 start_dt = pd.to_datetime(date_range[0])
 end_dt = pd.to_datetime(date_range[1]) + pd.Timedelta(days=1)
@@ -104,10 +97,6 @@ if hero_filter == "Solo Heroes":
     df = df[df['is_laboral_hero'] == True]
 elif hero_filter == "No Heroes":
     df = df[df['is_laboral_hero'] == False]
-# score
-if score_range and 'score' in df.columns:
-    df['score'] = pd.to_numeric(df['score'], errors='coerce')
-    df = df[(df['score'] >= score_range[0]) & (df['score'] <= score_range[1])]
 
 # -------------------------
 # KPIs principales (fila superior)

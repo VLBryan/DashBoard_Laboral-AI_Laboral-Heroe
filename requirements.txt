@@ -5,6 +5,18 @@ plotly
 altair
 pyarrow
 
+Crear arvhivo config_private.py :
+
+# config_private.py
+# Aquí defines tus credenciales y configuraciones privadas
+
+DB_NAME = "laboral_ai_db"
+MONGO_URI = "mongodb://usuario:password@host:27017"
+CACHE_DIR = "./cache"
+
+
+
+
 
 Tareas:
 Performance: si tienes muchas ubicaciones y usuarios, pre-agrega (ETL) y guarda parquet por nivel (country/region/city) para consultas rápidas en Streamlit.
