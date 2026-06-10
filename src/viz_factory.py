@@ -165,5 +165,5 @@ def kpi_indicator(value: float, title: str, delta: Optional[float] = None, fmt: 
         delta={'reference': delta} if delta is not None else None,
         title={'text': title}
     ))
-    fig.update_layout(margin=dict(l=10,r=10,t=20,b=10), height=120)
+    fig.update_layout(margin=dict(l=10,r=10,t=50,b=10), height=140)
     return fig

@@ -85,12 +85,22 @@ def normalize_location(df: pd.DataFrame, location_col: str = "location") -> pd.D
                     "city": x.get("city") or x.get("ciudad") or None
                 }
             s = str(x)
-            parts = [p.strip() for p in s.split("/") if p.strip()]
-            return {
-                "country": parts[0] if len(parts) > 0 else None,
-                "region": parts[1] if len(parts) > 1 else None,
-                "city": parts[2] if len(parts) > 2 else None
-            }
+            if "/" in s:
+                parts = [p.strip() for p in s.split("/") if p.strip()]
+                return {
+                    "country": parts[0] if len(parts) > 0 else None,
+                    "region": parts[1] if len(parts) > 1 else None,
+                    "city": parts[2] if len(parts) > 2 else None
+                }
+            # Formato "Ciudad, Pais" o "Ciudad, Region, Pais"
+            parts = [p.strip() for p in s.split(",") if p.strip()]
+            if len(parts) == 0:
+                return {"country": None, "region": None, "city": None}
+            if len(parts) == 1:
+                return {"country": parts[0], "region": None, "city": None}
+            if len(parts) == 2:
+                return {"country": parts[1], "region": None, "city": parts[0]}
+            return {"country": parts[-1], "region": parts[1], "city": parts[0]}
         locs = df[location_col].apply(split_loc).apply(pd.Series)
         df = pd.concat([df, locs], axis=1)
     return df
@@ -99,8 +109,8 @@ def explode_list_field(df: pd.DataFrame, id_col: str, list_col: str, new_col_nam
     if list_col not in df.columns:
         return pd.DataFrame(columns=[id_col, new_col_name])
     def to_list(x):
-        if pd.isna(x): return []
         if isinstance(x, list): return x
+        if pd.isna(x): return []
         try:
             parsed = json.loads(x)
             if isinstance(parsed, list): return parsed
@@ -135,6 +145,23 @@ def get_series(df: pd.DataFrame, col: str, default: str = "") -> pd.Series:
     return pd.Series([default] * len(df), index=df.index)
 
 
+def compute_employability_total_score(row, fields: List[str]) -> float:
+    """
+    Suma los sub-scores de empleabilidad (education, experience, hard_skills,
+    languages, linkedin, projects, soft_skills), tolerando campos ausentes o
+    valores no numéricos.
+    """
+    total = 0.0
+    for field in fields:
+        value = row.get(field)
+        if isinstance(value, dict):
+            try:
+                total += float(value.get("score", 0) or 0)
+            except (TypeError, ValueError):
+                pass
+    return total
+
+
 # -------------------------
 # Cargas y joins principales
 # -------------------------
@@ -158,6 +185,13 @@ def build_df_master(dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     emp = dfs.get("employabilities", pd.DataFrame()).copy()
     apps = dfs.get("applications", pd.DataFrame()).copy()
 
+    # Derivar score total de empleabilidad desde los sub-scores anidados
+    # (education, experience, hard_skills, ...) antes de sanitizar, ya que
+    # sanitize_dataframe_for_parquet convierte esos dicts en JSON strings.
+    if not emp.empty and "score" not in emp.columns:
+        score_fields = ["education", "experience", "hard_skills", "languages", "linkedin", "projects", "soft_skills"]
+        emp["score"] = emp.apply(lambda row: compute_employability_total_score(row, score_fields), axis=1)
+
     # Sanitizar fuentes
     users = sanitize_dataframe_for_parquet(users)
     cvs = sanitize_dataframe_for_parquet(cvs)
@@ -170,14 +204,13 @@ def build_df_master(dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     emp = ensure_datetime(emp, ["createdAt", "updatedAt"])
     apps = ensure_datetime(apps, ["createdAt", "updatedAt"])
 
-    # Ubicaciones
-    users = normalize_location(users, "location")
+    # Ubicaciones (cvs.location viene como "Ciudad, Pais")
     cvs = normalize_location(cvs, "location")
 
     # Merge users <- cvs
     if not cvs.empty:
         cvs_small = cvs.rename(columns={"_id": "cv_id", "user": "user_id"})
-        cols_needed = [c for c in ["cv_id", "user_id", "profession", "location", "createdAt"] if c in cvs_small.columns]
+        cols_needed = [c for c in ["cv_id", "user_id", "profession", "location", "country", "region", "city", "createdAt"] if c in cvs_small.columns]
         cvs_small = cvs_small[cols_needed].drop_duplicates(subset=["user_id"], keep="first")
         left_on = "_id" if "_id" in users.columns else ("user_id" if "user_id" in users.columns else None)
         if left_on:
@@ -241,8 +274,8 @@ def build_df_master(dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     if not apps.empty:
         apps = sanitize_dataframe_for_parquet(apps)
         apps = normalize_colnames(apps) if 'normalize_colnames' in globals() else apps
-        # buscar columna user en apps
-        user_col = "user" if "user" in apps.columns else ("user_id" if "user_id" in apps.columns else None)
+        # buscar columna que referencia al usuario en apps
+        user_col = "applicant" if "applicant" in apps.columns else ("user" if "user" in apps.columns else ("user_id" if "user_id" in apps.columns else None))
         if user_col:
             apps[user_col] = apps[user_col].astype(str)
             apps_count = apps.groupby(user_col).size().rename("n_applications").reset_index()
@@ -254,30 +287,24 @@ def build_df_master(dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     else:
         df["n_applications"] = get_series(df, "n_applications", default="").fillna(0).astype(int)
 
-    # Recalcular top_skills desde df_user_skills (si existe)
-    user_sk = dfs.get("cvs_skills", pd.DataFrame()).copy()
-    # si ya tienes df_user_skills precomputado, úsalo en su lugar
-    if "df_user_skills" in locals() and not locals()["df_user_skills"].empty:
-        skills_df = locals()["df_user_skills"].copy()
-    else:
-        # intentar construir skills_df desde cvs_sk + skills
-        skills_df = None
-        try:
-            cvs_sk = dfs.get("cvs_skills", pd.DataFrame()).copy()
-            skills = dfs.get("skills", pd.DataFrame()).copy()
-            cvs = dfs.get("cvs", pd.DataFrame()).copy()
-            # normalizar nombres si es necesario
-            if not cvs_sk.empty and not cvs.empty:
-                cvs_map = cvs.rename(columns={"_id":"cv_id","user":"user_id"})[["cv_id","user_id"]]
-                cvs_sk = cvs_sk.rename(columns={"id_cvs":"cv_id","id_skills":"skill_id"})
-                merged = cvs_sk.merge(cvs_map, on="cv_id", how="left")
-                if not skills.empty:
-                    skills_small = skills.rename(columns={"_id":"skill_id","name":"skill_name"})[["skill_id","skill_name"]]
-                    merged = merged.merge(skills_small, on="skill_id", how="left")
-                merged["user_id"] = merged["user_id"].astype(str)
-                skills_df = merged.groupby(["user_id","skill_name"]).size().rename("count").reset_index()
-        except Exception:
-            skills_df = pd.DataFrame()
+    # Recalcular top_skills desde cvs_skills + skills + cvs
+    skills_df = None
+    try:
+        cvs_sk = dfs.get("cvs_skills", pd.DataFrame()).copy()
+        skills = dfs.get("skills", pd.DataFrame()).copy()
+        cvs = dfs.get("cvs", pd.DataFrame()).copy()
+        # normalizar nombres si es necesario
+        if not cvs_sk.empty and not cvs.empty:
+            cvs_map = cvs.rename(columns={"_id":"cv_id","user":"user_id"})[["cv_id","user_id"]]
+            cvs_sk = cvs_sk.rename(columns={"id_cvs":"cv_id","id_skills":"skill_id"})
+            merged = cvs_sk.merge(cvs_map, on="cv_id", how="left")
+            if not skills.empty:
+                skills_small = skills.rename(columns={"_id":"skill_id","name":"skill_name"})[["skill_id","skill_name"]]
+                merged = merged.merge(skills_small, on="skill_id", how="left")
+            merged["user_id"] = merged["user_id"].astype(str)
+            skills_df = merged.groupby(["user_id","skill_name"]).size().rename("count").reset_index()
+    except Exception:
+        skills_df = pd.DataFrame()
 
     if skills_df is not None and not skills_df.empty:
         top = skills_df.groupby("user_id").apply(
