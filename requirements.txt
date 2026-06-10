@@ -1,22 +1,8 @@
-streamlit>=1.20
-pandas
-pymongo
-plotly
-altair
-pyarrow
-
-Crear arvhivo config_private.py :
-
-# config_private.py
-# Aquí defines tus credenciales y configuraciones privadas
-
-DB_NAME = "laboral_ai_db"
-MONGO_URI = "mongodb://usuario:password@host:27017"
-CACHE_DIR = "./cache"
-
-
-
-
-
-Tareas:
-Performance: si tienes muchas ubicaciones y usuarios, pre-agrega (ETL) y guarda parquet por nivel (country/region/city) para consultas rápidas en Streamlit.
+streamlit>=1.20,<2.0
+pandas>=2.0
+numpy>=1.25
+pymongo>=4.0
+pyarrow>=12.0
+python-dotenv>=1.0
+plotly>=5.0
+altair>=5.0
