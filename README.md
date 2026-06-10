@@ -49,18 +49,25 @@ venv\Scripts\activate      # Windows
 ```bash
 pip install -r requirements.txt
 ```
-### Archivo de configuración privada
+### Variables de entorno
 
-Crea config_private.py en la raíz del proyecto. No lo subas a GitHub.
+Copia `.env.example` a `.env` y completa tus credenciales. No lo subas a GitHub.
 
 ```bash
-# config_private.py
-# Aquí defines tus credenciales y configuraciones privadas
-
-DB_NAME = "laboral_ai_db"
-MONGO_URI = "mongodb://usuario:password@host:27017"
-CACHE_DIR = "./cache"
+cp .env.example .env
 ```
+
+```bash
+# .env
+MONGO_URI=mongodb+srv://usuario:password@cluster-host/db_name?retryWrites=true&w=majority&appName=app-name
+LABORAL_DB=nombre_de_tu_db
+CACHE_DIR=./cache   
+```
+
+`config.py` carga estas variables (vía `python-dotenv`) y las expone como
+`DB_NAME`, `MONGO_URI` y `CACHE_DIR`. Alternativamente, si existe un archivo
+`config_private.py` en la raíz con esas mismas variables, tiene prioridad sobre
+el `.env`.
 
 ## Uso y ejecución
 
@@ -93,6 +100,41 @@ Dar permisos y ejecutar:
 ```bash
 chmod +x run.sh
 ./run.sh
+```
+
+## Estructura del proyecto
+
+```
+.
+├── app.py                # Entrypoint de Streamlit (UI)
+├── config.py             # Carga de configuración (.env / config_private.py)
+├── src/
+│   ├── data_loader.py     # ETL: Mongo -> df_master / df_user_skills + cache Parquet
+│   ├── kpi_calculator.py  # KPIs globales
+│   ├── kpi_by_location.py # KPIs segmentados por ubicación
+│   └── viz_factory.py     # Gráficos Plotly/Altair
+├── scripts/
+│   └── run_etl.py          # Refresca el cache Parquet sin levantar Streamlit
+├── tests/                  # Tests unitarios (pytest)
+└── cache/                   # Cache local en Parquet (no versionado)
+```
+
+## ETL standalone
+
+Para refrescar el cache de datos (`cache/df_master.parquet`,
+`cache/df_user_skills.parquet`) sin levantar el dashboard:
+
+```bash
+python scripts/run_etl.py
+```
+
+## Tests
+
+Instala las dependencias de desarrollo y corre la suite con `pytest`:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
 ```
 
 ## Autor

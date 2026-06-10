@@ -5,37 +5,26 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # importar módulos previos
-from data_loader import build_all, load_df_cache
-from kpi_calculator import (
+from src.data_loader import build_all, load_df_cache
+from src.kpi_calculator import (
     compute_basic_kpis, compute_new_users_by_window, compute_application_kpis,
     compute_top_skills_coverage, compute_hero_comparison, compute_time_series
 )
-from kpi_by_location import (
+from src.kpi_by_location import (
     compute_basic_kpis_by_location, compute_top_skills_by_location,
     compute_hero_vs_nonhero_by_location, compute_time_series_by_location,
     prepare_choropleth_df
 )
-from viz_factory import (
+from src.viz_factory import (
     choropleth_by_country, top_skills_bar, score_distribution,
     time_series_users, kpi_indicator, simple_funnel
 )
+from config import DB_NAME, MONGO_URI, CACHE_DIR
 
 # -------------------------
 # Config
 # -------------------------
 st.set_page_config(layout="wide", page_title="Laboral.AI - Dashboard Postulantes")
-
-# importar configuración privada
-try:
-    import config_private
-    DB_NAME = config_private.DB_NAME
-    MONGO_URI = config_private.MONGO_URI
-    CACHE_DIR = config_private.CACHE_DIR
-except ImportError:
-    # fallback si no existe el archivo (ej. en despliegue público)
-    DB_NAME = os.getenv("LABORAL_DB", "nombre_de_tu_db")
-    MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-    CACHE_DIR = "./cache"
 
 # -------------------------
 # Data loading (cached)
@@ -105,11 +94,15 @@ basic = compute_basic_kpis(df)
 apps_kpis = compute_application_kpis(df)
 new_users = compute_new_users_by_window(df)
 
+st.write("")
+
+kpi_config = {'displayModeBar': False}
+
 col1, col2, col3, col4, col5 = st.columns([1.2,1.2,1.2,1.2,1.2])
-col1.plotly_chart(kpi_indicator(basic["total_users"], "Total postulantes"), use_container_width=True)
-col2.plotly_chart(kpi_indicator(basic["laboral_heroes_count"], "Laboral Heroes"), use_container_width=True)
-col3.plotly_chart(kpi_indicator(basic["avg_employability_score"] or 0, "Promedio score", fmt=".1f"), use_container_width=True)
-col4.plotly_chart(kpi_indicator(apps_kpis["total_applications"], "Total aplicaciones"), use_container_width=True)
+col1.plotly_chart(kpi_indicator(basic["total_users"], "Total postulantes"), use_container_width=True, config=kpi_config)
+col2.plotly_chart(kpi_indicator(basic["laboral_heroes_count"], "Laboral Heroes"), use_container_width=True, config=kpi_config)
+col3.plotly_chart(kpi_indicator(basic["avg_employability_score"] or 0, "Promedio score", fmt=".1f"), use_container_width=True, config=kpi_config)
+col4.plotly_chart(kpi_indicator(apps_kpis["total_applications"], "Total aplicaciones"), use_container_width=True, config=kpi_config)
 col5.metric("Nuevos 30d", new_users.get("new_users_30d", 0))
 
 st.markdown("---")

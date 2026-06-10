@@ -99,8 +99,8 @@ def explode_list_field(df: pd.DataFrame, id_col: str, list_col: str, new_col_nam
     if list_col not in df.columns:
         return pd.DataFrame(columns=[id_col, new_col_name])
     def to_list(x):
-        if pd.isna(x): return []
         if isinstance(x, list): return x
+        if pd.isna(x): return []
         try:
             parsed = json.loads(x)
             if isinstance(parsed, list): return parsed
@@ -254,30 +254,24 @@ def build_df_master(dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     else:
         df["n_applications"] = get_series(df, "n_applications", default="").fillna(0).astype(int)
 
-    # Recalcular top_skills desde df_user_skills (si existe)
-    user_sk = dfs.get("cvs_skills", pd.DataFrame()).copy()
-    # si ya tienes df_user_skills precomputado, úsalo en su lugar
-    if "df_user_skills" in locals() and not locals()["df_user_skills"].empty:
-        skills_df = locals()["df_user_skills"].copy()
-    else:
-        # intentar construir skills_df desde cvs_sk + skills
-        skills_df = None
-        try:
-            cvs_sk = dfs.get("cvs_skills", pd.DataFrame()).copy()
-            skills = dfs.get("skills", pd.DataFrame()).copy()
-            cvs = dfs.get("cvs", pd.DataFrame()).copy()
-            # normalizar nombres si es necesario
-            if not cvs_sk.empty and not cvs.empty:
-                cvs_map = cvs.rename(columns={"_id":"cv_id","user":"user_id"})[["cv_id","user_id"]]
-                cvs_sk = cvs_sk.rename(columns={"id_cvs":"cv_id","id_skills":"skill_id"})
-                merged = cvs_sk.merge(cvs_map, on="cv_id", how="left")
-                if not skills.empty:
-                    skills_small = skills.rename(columns={"_id":"skill_id","name":"skill_name"})[["skill_id","skill_name"]]
-                    merged = merged.merge(skills_small, on="skill_id", how="left")
-                merged["user_id"] = merged["user_id"].astype(str)
-                skills_df = merged.groupby(["user_id","skill_name"]).size().rename("count").reset_index()
-        except Exception:
-            skills_df = pd.DataFrame()
+    # Recalcular top_skills desde cvs_skills + skills + cvs
+    skills_df = None
+    try:
+        cvs_sk = dfs.get("cvs_skills", pd.DataFrame()).copy()
+        skills = dfs.get("skills", pd.DataFrame()).copy()
+        cvs = dfs.get("cvs", pd.DataFrame()).copy()
+        # normalizar nombres si es necesario
+        if not cvs_sk.empty and not cvs.empty:
+            cvs_map = cvs.rename(columns={"_id":"cv_id","user":"user_id"})[["cv_id","user_id"]]
+            cvs_sk = cvs_sk.rename(columns={"id_cvs":"cv_id","id_skills":"skill_id"})
+            merged = cvs_sk.merge(cvs_map, on="cv_id", how="left")
+            if not skills.empty:
+                skills_small = skills.rename(columns={"_id":"skill_id","name":"skill_name"})[["skill_id","skill_name"]]
+                merged = merged.merge(skills_small, on="skill_id", how="left")
+            merged["user_id"] = merged["user_id"].astype(str)
+            skills_df = merged.groupby(["user_id","skill_name"]).size().rename("count").reset_index()
+    except Exception:
+        skills_df = pd.DataFrame()
 
     if skills_df is not None and not skills_df.empty:
         top = skills_df.groupby("user_id").apply(

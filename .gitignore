@@ -1,1 +1,13 @@
 **/config_private.py
+.env
+
+# Entorno virtual
+venv/
+
+# Cache de Python
+__pycache__/
+*.pyc
+
+# Cache de datos del dashboard
+cache/
+*.parquet
