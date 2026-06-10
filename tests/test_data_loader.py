@@ -7,6 +7,7 @@ from src.data_loader import (
     normalize_location,
     explode_list_field,
     normalize_colnames,
+    compute_employability_total_score,
 )
 
 
@@ -44,6 +45,45 @@ def test_normalize_location_string():
     assert out.loc[0, ["country", "region", "city"]].tolist() == ["Peru", "Lima", "Miraflores"]
     assert out.loc[1, "country"] == "Chile"
     assert pd.isna(out.loc[1, "region"])
+
+
+def test_normalize_location_city_country():
+    df = pd.DataFrame({"location": ["Lima, Peru", "Santiago, Region Metropolitana, Chile"]})
+    out = normalize_location(df)
+    assert out.loc[0, "country"] == "Peru"
+    assert out.loc[0, "city"] == "Lima"
+    assert pd.isna(out.loc[0, "region"])
+    assert out.loc[1, "country"] == "Chile"
+    assert out.loc[1, "city"] == "Santiago"
+    assert out.loc[1, "region"] == "Region Metropolitana"
+
+
+def test_normalize_location_empty_string():
+    df = pd.DataFrame({"location": ["", ",", "  "]})
+    out = normalize_location(df)
+    assert out["country"].isna().all()
+    assert out["region"].isna().all()
+    assert out["city"].isna().all()
+
+
+def test_compute_employability_total_score():
+    row = {
+        "education": {"score": "9"},
+        "experience": {"score": "20"},
+        "hard_skills": {"score": "6"},
+        "languages": {"score": "0"},
+        "linkedin": {"score": "5"},
+        "projects": {"score": "0"},
+        "soft_skills": {"score": "0"},
+    }
+    fields = ["education", "experience", "hard_skills", "languages", "linkedin", "projects", "soft_skills"]
+    assert compute_employability_total_score(row, fields) == 40.0
+
+
+def test_compute_employability_total_score_missing_fields():
+    row = {"education": {"score": "9"}, "experience": None}
+    fields = ["education", "experience", "hard_skills"]
+    assert compute_employability_total_score(row, fields) == 9.0
 
 
 def test_explode_list_field():
