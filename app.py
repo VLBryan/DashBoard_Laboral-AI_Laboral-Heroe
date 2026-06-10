@@ -46,7 +46,8 @@ st.sidebar.header("Filtros globales")
 # Fecha
 max_date = pd.to_datetime(df_master['createdAt']).max() if 'createdAt' in df_master.columns else pd.Timestamp.now()
 min_date = pd.to_datetime(df_master['createdAt']).min() if 'createdAt' in df_master.columns else (max_date - pd.Timedelta(days=365))
-date_range = st.sidebar.date_input("Rango de registro", [min_date.date(), max_date.date()])
+start_date = st.sidebar.date_input("Desde", min_date.date(), min_value=min_date.date(), max_value=max_date.date())
+end_date = st.sidebar.date_input("Hasta", max_date.date(), min_value=min_date.date(), max_value=max_date.date())
 
 # Ubicación
 countries = sorted(df_master['country'].dropna().unique().tolist()) if 'country' in df_master.columns else []
@@ -74,8 +75,8 @@ if st.sidebar.button("Forzar recarga datos (ETL)"):
 df = df_master.copy()
 
 # fecha
-start_dt = pd.to_datetime(date_range[0])
-end_dt = pd.to_datetime(date_range[1]) + pd.Timedelta(days=1)
+start_dt = pd.to_datetime(start_date)
+end_dt = pd.to_datetime(end_date) + pd.Timedelta(days=1)
 if 'createdAt' in df.columns:
     df = df[(pd.to_datetime(df['createdAt']) >= start_dt) & (pd.to_datetime(df['createdAt']) < end_dt)]
 # country
