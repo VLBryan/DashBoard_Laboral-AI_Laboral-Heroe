@@ -32,7 +32,7 @@ Incluye KPIs, filtros dinámicos, vistas por usuario y agregados de habilidades 
 ### Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/DashBoard_Laboral-AI_Laboral-Heroe.git
+git clone https://github.com/VLBryan/DashBoard_Laboral-AI_Laboral-Heroe.git
 cd DashBoard_Laboral-AI_Laboral-Heroe
 ```
 
